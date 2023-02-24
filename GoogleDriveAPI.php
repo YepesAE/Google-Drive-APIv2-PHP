@@ -25,6 +25,42 @@ class googleManager(){
     }
 
 
+    // Returns a file given a parent and a name. 
+    function getFileIdInParentFolder($parentId, $filename){
+      $files = self::getFilesFromFolderId($parentId);
+      foreach ($files as $file) {
+          if($file['name'] == $filename){
+            return $file['id'];
+          }
+      }
+    }
+
+
+    // Returns all files in a folder
+    function getFilesFromFolderId($parentId){
+      $connection = self::connectToDrive();
+      $optParams = array(
+        'pageSize' => 1000,
+        'orderBy' => "name",
+        'q' => "'".$parentId."' in parents"
+        );
+      $list = $connection["service"]->files->listFiles($optParams);
+      return $list;
+    }
+
+
+    // Checks for file with specific name in your Drive and deletes it
+    function clearFileByName($filename){
+      $connection = self::connectToDrive();
+      $list = $connection["service"]->files->listFiles();
+      foreach ($list as $file) {
+        if($file["name"] == $filename){
+          $connection["service"]->files->delete($file["id"]);
+        }
+      }
+    }
+
+
     // Function that checks if folder with specific name already exist in another folder.
     // Notice that this is a linear function, the more folders you have, the more it will take to 
     // check.
@@ -58,7 +94,7 @@ class googleManager(){
         $file->setMimeType("application/vnd.google-apps.folder");
         $file->setDescription($description);
 
-        $resultado = $connection["service"]->files->create(
+        $res = $connection["service"]->files->create(
             $file,
             array(
                 'data' => file_get_contents($file_path),
@@ -154,7 +190,7 @@ class googleManager(){
     }
 
 
-    //
+    // Function  that changes the permission of a file given a role.
     function editPermission($service, $fileId, $permissionId, $role) {
       try {
           $updatedPerm = new Google_Service_Drive_Permission();
@@ -163,6 +199,60 @@ class googleManager(){
       } catch (Exception $e) {
         echo $e;
       }
+    }
+
+
+    // Edit the permission of specific user in specific file
+    function editPermissionByMail($service, $fileId, $mail, $role){
+      $permissions = googleManager :: retrievePermissions($service, $fileId);
+      foreach ($permissions as $p) {
+          if($p["emailAddress"] == $mail){
+              googleManager :: editPermission($service, $fileId, $p["id"], $role);
+          }
+      }
+    }
+
+
+    // Given a File ID makes it visible for everyone
+    function giveAnyonePermission($fileId){
+      $optParams = array(
+        'sendNotificationEmail' => false
+      );
+      try{
+        $connection = self::connectToDrive();
+        $permission = new Google_Service_Drive_Permission();
+        $permission->setRole("reader");
+        $permission->setType('anyone');
+
+        $connection["service"]->permissions->create($fileId, $permission, $optParams);
+      }catch (Exception $e){
+        echo $e;
+      }
+    }
+
+
+
+    // Function that creates a shortcut of a folder into another folder
+    function copyFolderInParent($destinationFolderId, $sourceFolderId){
+      $connection = self::connectToDrive();
+      $file_path = "/";
+
+      $file = new Google_Service_Drive_DriveFile(array(
+        'title' => 'Shortcut to Target Folder',
+        'mimeType' => 'application/vnd.google-apps.shortcut',
+        'shortcutDetails' => array('targetId' => $sourceFolderId)
+      ));
+
+      $file->setParents(array($destinationFolderId));
+
+      $resultado = $connection["service"]->files->create(
+        $file,
+        array(
+            'data' => file_get_contents($file_path),
+            'mimeType' => "application/vnd.google-apps.shortcut",
+            'uploadType' => 'media'
+        )
+      );
     }
 
 }
