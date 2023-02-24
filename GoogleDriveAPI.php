@@ -1,6 +1,6 @@
 <?php 
 // Importable class with various custom functions to manage google Drive documents
-// folder, and permissions from php.
+// folder, and permissions from php. 
 
 include 'path/to/autoload.php'
 
